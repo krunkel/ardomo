@@ -1,0 +1,89 @@
+void LoadProg() {  
+//  ==READ PROG FROM SD ======================================
+  char lijn[80]
+  if (!SD.begin(4)) {
+    Serial.println("initialization failed!");
+    // TODO Lees STD prog uit Flash (DueFlashStorage) 
+    }
+  else {
+//  1/MODULES
+    File myFile = SD.open("/mainprog/modules.csv");
+    // String lijn = "";
+    // byte fTel = 0;
+    while (myFile.available()) {
+      LeesLijn(myFile,
+      char fNext = myFile.peek();
+      if (fNext = '#') {
+        lijn = myFile.readStringUntil('\n');
+        fNext = myFile.peek();
+      } 
+      mod_ID[fTel] = (byte)myFile.parseInt();
+      mod_BUS[fTel] = (byte)myFile.parseInt();
+      mod_Address[fTel] = myFile.parseInt();
+      mod_NumDO[fTel] = (byte)myFile.parseInt();
+      mod_NumAO[fTel] = (byte)myFile.parseInt();
+      mod_NumDI[fTel] = (byte)myFile.parseInt();
+      mod_NumAI[fTel] = (byte)myFile.parseInt();
+      //    myFile.readBytesUntil(';', Mod_Name[fmod], 20);
+      #ifdef DO_DEBUG
+        Serial.print(mod_ID[fTel]);
+        Serial.println(F("= module"));
+      #endif
+      fTel++;   
+    }
+    myFile.close();
+    num_mod = fTel;
+//  2/Timers
+    myFile = SD.open("/mainprog/timers.csv");
+    fTel = 0;
+    while (myFile.available()) {
+      char fNext = myFile.peek();
+      if (fNext = '#') {
+        lijn = myFile.readStringUntil('\n');
+        fNext = myFile.peek();
+      } 
+      tim_ID[fTel] = (byte)myFile.parseInt();
+      tim_Year[fTel] = myFile.parseInt();
+      tim_Month[fTel] = (byte)myFile.parseInt();
+      tim_Day[fTel] = (byte)myFile.parseInt();
+      tim_Hour[fTel] = (byte)myFile.parseInt();
+      tim_Min[fTel] = (byte)myFile.parseInt();
+      tim_Sec[fTel] = (byte)myFile.parseInt();
+//      tim_Act[fTel][ACT_LENGHT];
+      #ifdef DO_DEBUG
+        Serial.print(tim_ID[fTel]);
+        Serial.println(F("= timer"));
+      #endif      fTel++;   
+    }
+    myFile.close();
+    num_tim = fTel;
+//  3/MOOOS
+    myFile = SD.open("/mainprog/moods.csv");
+    fTel = 0;
+    byte fTelEl = 0;
+    while (myFile.available()) {
+      char fNext = myFile.peek();
+      if (fNext = '#') {
+        lijn = myFile.readStringUntil('\n');
+        fNext = myFile.peek();
+      } 
+      moo_ID[fTel] = (byte)myFile.parseInt();
+      moo_Lenght[fTel] = (byte)myFile.parseInt();
+      moo_Pointer[fTel] = (byte)fTelEl;
+      while (fTelEl < (moo_Lenght[fTel] + moo_Pointer[fTel])) {
+        moo_Module[fTelEl] = (byte)myFile.parseInt();
+        moo_Port[fTelEl] = (byte)myFile.parseInt();
+        moo_Value[fTelEl] = (byte)myFile.parseInt();
+        fTelEl++;   
+      }
+      #ifdef DO_DEBUG
+        Serial.print(moo_ID[fTel]);
+        Serial.println(F("= mood"));
+      #endif
+      fTel++;   
+    }
+    myFile.close();
+    num_moo = fTel;
+  }
+}
+void LeesRegel (  

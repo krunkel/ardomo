@@ -1,0 +1,581 @@
+/* Astronomical Night Lamp by Paulo Oliveira. www.paulorenato.com
+ * Turns a relay driven through LED I/O #13 ON/OFF at sunset/sunrise according to the current
+ * date andthe user's Lattitude and Longitude. Uses ad DS1307 RTC for time and battery backup.
+ * Displays time, sunrise and sunset on a 4x 7-segment display. Full article at:
+ * http://paulorenato.com/joomla/index.php?option=com_content&view=article&id=125&Itemid=4
+ */
+
+/******************* CONSTANTS AND VARIABLES *******************
+****************************************************************/
+#include <Time.h>  
+#include <TimeLord.h>
+#include <Wire.h>       // Needed for I2C communication
+#include <DS1307RTC.h>  // a basic DS1307 library that returns time as a time_t
+
+#define DS1307_ADDRESS 0x68
+#define LED 13 //LED night light (or Relay control). Default in Arduino for test
+#define SUNS 1
+#define SUNR 2
+#define TEMPO 3
+#define DEBUG 1  // Set to 1 to enable debug messages through serial port monitor
+#define FAST_THRESHOLD 50 // Button thresholds. Controls timing. Makes code pretty.
+#define SUPER_FAST_THRESHOLD 150
+#define SUPER_FAST_DIVIDER 1
+#define FAST_DIVIDER 4
+#define SLOW_DIVIDER 25
+
+const int TIMEZONE = -8; //PST
+const float LATITUDE = 38.65, LONGITUDE = -121.15; // set your position here
+
+TimeLord myLord; // TimeLord Object, Global variable
+byte sunTime[]  = {0, 0, 0, 1, 1, 13}; // 17 Oct 2013
+int minNow, minLast = -1, hourNow, hourLast = -1, minOfDay; //time parts to trigger various actions. 															// -1 init so hour/min last inequality is triggered the first time around
+int mSunrise, mSunset; //sunrise and sunset expressed as minute of day (0-1439)
+// Need to adapt this according to the actual physical connections:
+int digit1 = 12; //PWM Display 
+int digit2 = 11; //PWM Display
+int digit3 = 10; //PWM Display 
+int digit4 = 9; //PWM Display
+
+//Pin mapping for seven-segment drive
+int segG = 8; //digG
+int segF = 7; //digF
+int segC = 6; //digC
+int segA = 5; //digA
+int segB = 4; //digB
+int segD = 3; //digD
+int segE = 2; //digE
+
+//Push Buttons for time adjust. Note Analog A0-A5 => [14 ... 19]
+int BTN_PLUS = 14; //A0
+int BTN_MINUS = 15; //A1
+
+
+/************************ ARDUINO SETUP  ***********************
+****************************************************************/
+void setup()  {
+  Serial.begin(9600);
+  while (!Serial) ; // Needed for Leonardo only
+  /* Set Pin Modes Appropriately */
+  pinMode(LED, OUTPUT);
+  pinMode(segA, OUTPUT);
+  pinMode(segB, OUTPUT);
+  pinMode(segC, OUTPUT);
+  pinMode(segD, OUTPUT);
+  pinMode(segE, OUTPUT);
+  pinMode(segF, OUTPUT);
+  pinMode(segG, OUTPUT);
+  pinMode(digit1, OUTPUT);
+  pinMode(digit2, OUTPUT);
+  pinMode(digit3, OUTPUT);
+  pinMode(digit4, OUTPUT);
+  
+  pinMode(BTN_PLUS, INPUT);
+  pinMode(BTN_MINUS, INPUT);
+  
+  /* TimeLord Object Initialization */
+  myLord.TimeZone(TIMEZONE * 60);
+  myLord.Position(LATITUDE, LONGITUDE);
+  myLord.DstRules(3,2,11,1,60); // DST Rules for USA
+  
+  setSyncProvider(RTC.get);   // the function to get the time from the RTC
+  if(timeStatus()!= timeSet) 
+     Serial.println("Unable to sync with the RTC");
+  else
+     Serial.println("RTC has set the system time");  
+ 
+}
+
+/******************** MAIN LOOP STARTS HERE  *******************
+****************************************************************/
+void loop(){   
+  if (timeStatus()!= timeNotSet) {
+    digitalClockDisplay();  
+    check_buttons();
+    minNow = minute();
+    if (minNow != minLast) {
+        minLast = minNow;
+        hourNow = hour();
+        minOfDay = hourNow * 60 + minNow; //minute of day will be in the range 0-1439
+        #if DEBUG == 1
+          Serial.print(" hourNow");
+          Serial.print(hourNow);
+          Serial.print(" minNow");
+          Serial.print(minNow);
+          Serial.print("  minOfDay:");
+          Serial.print(minOfDay);
+          Serial.print("  minLast:");
+          Serial.print(minLast);
+          Serial.print("  hourLast:");
+          Serial.print(hourLast);
+          Serial.println();
+        #endif
+        if (hourNow != hourLast) { // Noting that the Sunrise/Sunset is only calculated every hour => less power. 
+			/* Sunrise: */
+			sunTime[3] = day(); // Uses the Time library to give Timelord the current date
+			sunTime[4] = month();
+            sunTime[5] = year();
+			myLord.SunRise(sunTime); // Computes Sun Rise. Prints:
+			mSunrise = sunTime[2] * 60 + sunTime[1];
+			#if DEBUG == 1
+                          Serial.print("SUNRISE:");
+  			  DisplayTime(sunTime);
+                        #endif
+			/* Sunset: */
+			sunTime[3] = day(); // Uses the Time library to give Timelord the current date
+			sunTime[4] = month();
+            sunTime[5] = year();
+			myLord.SunSet(sunTime); // Computes Sun Set. Prints:
+			mSunset = sunTime[2] * 60 + sunTime[1];
+            #if DEBUG == 1
+      			  Serial.print("SUNSET:");
+      			  DisplayTime(sunTime);
+            #endif
+            hourLast = hourNow;
+       }
+        digitalWrite(LED, minOfDay < mSunrise || minOfDay >= mSunset);
+        #if DEBUG == 1
+          Serial.print("  mSunrise:");
+          Serial.print(mSunrise);
+          Serial.print("  mSunset:");
+          Serial.print(mSunset);
+          Serial.print("  LED:");
+          Serial.print(minOfDay < mSunrise || minOfDay >= mSunset);
+          Serial.println();
+        #endif
+        
+        // if (minOfDay == mSunrise || minOfDay == mSunset) whistle(); Maybe cute to add sound later
+    } // End: if (minNow != minLast)
+  } // End:  if (timeStatus()!= timeNotSet)
+} // End loop()
+
+/************************* FUNCTIONS  **************************
+****************************************************************/
+
+void digitalClockDisplay(){
+// digital clock display of the time. 
+// It cycles through time->sunrise->sunset
+  int secondsNow; 
+  int offset;
+  byte DisplayTime[] = {0, 0, 0, 1, 1, 13};; // The time to display on 7-segment
+  byte SunriseTime[] = {0, 0, 0, 1, 1, 13};; // The sunrise time to display on 7-segment
+  byte SunsetTime[] = {0, 0, 0, 1, 1, 13};; // The sunset time to display on 7-segment
+  
+  #if DEBUG == 1 // Serial still displays actual time; not display time.
+    Serial.print(hour());
+    printDigits(minute());
+    printDigits(second());
+    Serial.print(" ");
+    Serial.print(day());
+    Serial.print(" ");
+    Serial.print(month());
+    Serial.print(" ");
+    Serial.print(year()); 
+    Serial.println(); 
+  #endif
+  
+  secondsNow = second();
+  DisplayTime[5] = year();
+  DisplayTime[4] = month();
+  DisplayTime[3] = day();
+  DisplayTime[2] = hour();
+  DisplayTime[1] = minute();
+  DisplayTime[0] = second();
+  myLord.DST(DisplayTime); // Adjust for DST for 7-segment display 
+  // Sunrise
+  SunriseTime[5] = year();
+  SunriseTime[4] = month();
+  SunriseTime[3] = day();
+  SunriseTime[2] = int(mSunrise/60);
+  SunriseTime[1] = mSunrise % 60;
+  SunriseTime[0] = second();
+  myLord.DST(SunriseTime); // Adjust for DST for 7-segment display 
+  // Sunset
+  SunsetTime[5] = year();
+  SunsetTime[4] = month();
+  SunsetTime[3] = day();
+  SunsetTime[2] = int(mSunset/60);
+  SunsetTime[1] = mSunset % 60;
+  SunsetTime[0] = second();
+  myLord.DST(SunsetTime); // Adjust for DST for 7-segment display 
+  
+  // Change the display depending on seconds() so it cycles time->sunrise->sunset
+  // 0-2 Display "T"
+  // 2 - 20 Display Actual Time
+  // 20 - 22 Display SS
+  // 22 - 40 Display Sunset Time
+  // 40 - 42 Display SR
+  // 42 - 60 Display Sunrise Time
+  if (secondsNow <= 2)
+        displayNumber(0, TEMPO);
+  else if ((secondsNow > 2) && (secondsNow <= 20))
+        displayHourMinute(DisplayTime[2], DisplayTime[1]);
+  else if ((secondsNow > 20) && (secondsNow <= 22))
+        displayNumber(0, SUNS);
+  else if ((secondsNow > 22) && (secondsNow <= 40))
+        displayHourMinute(SunsetTime[2], SunsetTime[1]);
+  else if ((secondsNow > 40) && (secondsNow <= 42))
+        displayNumber(0, SUNR);
+  else if ((secondsNow > 42) && (secondsNow <= 60))
+        displayHourMinute(SunriseTime[2], SunriseTime[1]);
+  else
+        Serial.print("FAILED");  
+}
+
+void printDigits(int digits){
+  // utility function for digital clock display: prints preceding colon and leading 0
+  Serial.print(":");
+  if(digits < 10)
+    Serial.print('0');
+  Serial.print(digits);
+}
+
+void DisplayTime(uint8_t * when)
+{
+Serial.print(when[2]);
+printDigits(when[1]);
+printDigits(when[0]);
+Serial.print(" ");
+Serial.print(when[4]);
+Serial.print("/");
+Serial.print(when[3]);
+Serial.print("/");
+Serial.print(when[5]); 
+Serial.println(); 
+}
+
+//Given a number, we display 10:22
+//After running through the 4 numbers, the display is left turned off
+
+//Display brightness
+//Each digit is on for a certain amount of microseconds
+//Then it is off until we have reached a total of 20ms for the function call
+//Let's assume each digit is on for 1000us
+//Each digit is on for 1ms, there are 4 digits, so the display is off for 16ms.
+//That's a ratio of 1ms to 16ms or 6.25% on time (PWM).
+//Let's define a variable called brightness that varies from:
+//5000 blindingly bright (15.7mA current draw per digit)
+//2000 shockingly bright (11.4mA current draw per digit)
+//1000 pretty bright (5.9mA)
+//500 normal (3mA)
+//200 dim but readable (1.4mA)
+//50 dim but readable (0.56mA)
+//5 dim but readable (0.31mA)
+//1 dim but readable in dark (0.28mA)
+
+void displayNumber(int toDisplay, int character) {
+#define DISPLAY_BRIGHTNESS  3000
+
+// toDisplay is the number to display if character == 0
+// if character is not 0, then a special character (SUNR/SUNS/TEMPO) is displayed instead
+
+// These would be used for common anode displays
+// #define DIGIT_ON  HIGH
+// #define DIGIT_OFF  LOW
+
+// Common Cathode diplay:
+#define DIGIT_ON  LOW
+#define DIGIT_OFF  HIGH
+
+  long beginTime = millis();
+
+  for(int digit = 4 ; digit > 0 ; digit--) {
+
+    //Turn on a digit for a short amount of time
+    switch(digit) {
+    case 1:
+      digitalWrite(digit1, DIGIT_ON);
+      break;
+    case 2:
+      digitalWrite(digit2, DIGIT_ON);
+      break;
+    case 3:
+      digitalWrite(digit3, DIGIT_ON);
+      break;
+    case 4:
+      digitalWrite(digit4, DIGIT_ON);
+      break;
+    }
+
+    if (character == 0) {
+    //Turn on the right segments for this digit
+    lightNumber(toDisplay % 10);
+    toDisplay /= 10;
+    }
+    else {
+      switch ( character ) {
+      case SUNS:
+      lightNumber(11); // Sunset Character
+      break;
+      case SUNR:
+      lightNumber(12); // Sunrise Character
+      break;
+      case TEMPO:
+      lightNumber(13); // Time Character
+      break;
+      }
+    }
+      
+
+    delayMicroseconds(DISPLAY_BRIGHTNESS); 
+    //Display digit for fraction of a second (1us to 5000us)
+
+    //Turn off all segments
+    lightNumber(10); 
+
+    //Turn off all digits
+    digitalWrite(digit1, DIGIT_OFF);
+    digitalWrite(digit2, DIGIT_OFF);
+    digitalWrite(digit3, DIGIT_OFF);
+    digitalWrite(digit4, DIGIT_OFF);
+  }
+
+  // while( (millis() - beginTime) < 10) ; TEST TO INCREMENT BRIGHTNESS
+  while( (millis() - beginTime) < 5) ; 
+  //Wait for time to pass before we paint the display again
+}
+
+//Given a number, turns on those segments
+//If number == 10, then turn off number
+void lightNumber(int numberToDisplay) {
+
+#define SEGMENT_ON  LOW
+#define SEGMENT_OFF HIGH
+
+  switch (numberToDisplay){
+
+  case 0:
+    digitalWrite(segA, SEGMENT_ON);
+    digitalWrite(segB, SEGMENT_ON);
+    digitalWrite(segC, SEGMENT_ON);
+    digitalWrite(segD, SEGMENT_ON);
+    digitalWrite(segE, SEGMENT_ON);
+    digitalWrite(segF, SEGMENT_ON);
+    digitalWrite(segG, SEGMENT_OFF);
+    break;
+
+  case 1:
+    digitalWrite(segA, SEGMENT_OFF);
+    digitalWrite(segB, SEGMENT_ON);
+    digitalWrite(segC, SEGMENT_ON);
+    digitalWrite(segD, SEGMENT_OFF);
+    digitalWrite(segE, SEGMENT_OFF);
+    digitalWrite(segF, SEGMENT_OFF);
+    digitalWrite(segG, SEGMENT_OFF);
+    break;
+
+  case 2:
+    digitalWrite(segA, SEGMENT_ON);
+    digitalWrite(segB, SEGMENT_ON);
+    digitalWrite(segC, SEGMENT_OFF);
+    digitalWrite(segD, SEGMENT_ON);
+    digitalWrite(segE, SEGMENT_ON);
+    digitalWrite(segF, SEGMENT_OFF);
+    digitalWrite(segG, SEGMENT_ON);
+    break;
+
+  case 3:
+    digitalWrite(segA, SEGMENT_ON);
+    digitalWrite(segB, SEGMENT_ON);
+    digitalWrite(segC, SEGMENT_ON);
+    digitalWrite(segD, SEGMENT_ON);
+    digitalWrite(segE, SEGMENT_OFF);
+    digitalWrite(segF, SEGMENT_OFF);
+    digitalWrite(segG, SEGMENT_ON);
+    break;
+
+  case 4:
+    digitalWrite(segA, SEGMENT_OFF);
+    digitalWrite(segB, SEGMENT_ON);
+    digitalWrite(segC, SEGMENT_ON);
+    digitalWrite(segD, SEGMENT_OFF);
+    digitalWrite(segE, SEGMENT_OFF);
+    digitalWrite(segF, SEGMENT_ON);
+    digitalWrite(segG, SEGMENT_ON);
+    break;
+
+  case 5:
+    digitalWrite(segA, SEGMENT_ON);
+    digitalWrite(segB, SEGMENT_OFF);
+    digitalWrite(segC, SEGMENT_ON);
+    digitalWrite(segD, SEGMENT_ON);
+    digitalWrite(segE, SEGMENT_OFF);
+    digitalWrite(segF, SEGMENT_ON);
+    digitalWrite(segG, SEGMENT_ON);
+    break;
+
+  case 6:
+    digitalWrite(segA, SEGMENT_ON);
+    digitalWrite(segB, SEGMENT_OFF);
+    digitalWrite(segC, SEGMENT_ON);
+    digitalWrite(segD, SEGMENT_ON);
+    digitalWrite(segE, SEGMENT_ON);
+    digitalWrite(segF, SEGMENT_ON);
+    digitalWrite(segG, SEGMENT_ON);
+    break;
+
+  case 7:
+    digitalWrite(segA, SEGMENT_ON);
+    digitalWrite(segB, SEGMENT_ON);
+    digitalWrite(segC, SEGMENT_ON);
+    digitalWrite(segD, SEGMENT_OFF);
+    digitalWrite(segE, SEGMENT_OFF);
+    digitalWrite(segF, SEGMENT_OFF);
+    digitalWrite(segG, SEGMENT_OFF);
+    break;
+
+  case 8:
+    digitalWrite(segA, SEGMENT_ON);
+    digitalWrite(segB, SEGMENT_ON);
+    digitalWrite(segC, SEGMENT_ON);
+    digitalWrite(segD, SEGMENT_ON);
+    digitalWrite(segE, SEGMENT_ON);
+    digitalWrite(segF, SEGMENT_ON);
+    digitalWrite(segG, SEGMENT_ON);
+    break;
+
+  case 9:
+    digitalWrite(segA, SEGMENT_ON);
+    digitalWrite(segB, SEGMENT_ON);
+    digitalWrite(segC, SEGMENT_ON);
+    digitalWrite(segD, SEGMENT_ON);
+    digitalWrite(segE, SEGMENT_OFF);
+    digitalWrite(segF, SEGMENT_ON);
+    digitalWrite(segG, SEGMENT_ON);
+    break;
+
+  case 10:
+    digitalWrite(segA, SEGMENT_OFF);
+    digitalWrite(segB, SEGMENT_OFF);
+    digitalWrite(segC, SEGMENT_OFF);
+    digitalWrite(segD, SEGMENT_OFF);
+    digitalWrite(segE, SEGMENT_OFF);
+    digitalWrite(segF, SEGMENT_OFF);
+    digitalWrite(segG, SEGMENT_OFF);
+    break;
+    
+   case 11: // S Character
+    digitalWrite(segA, SEGMENT_ON);
+    digitalWrite(segB, SEGMENT_OFF);
+    digitalWrite(segC, SEGMENT_ON);
+    digitalWrite(segD, SEGMENT_ON);
+    digitalWrite(segE, SEGMENT_OFF);
+    digitalWrite(segF, SEGMENT_ON);
+    digitalWrite(segG, SEGMENT_ON);
+    break;
+    
+    case 12: // R Character
+    digitalWrite(segA, SEGMENT_ON);
+    digitalWrite(segB, SEGMENT_ON);
+    digitalWrite(segC, SEGMENT_ON);
+    digitalWrite(segD, SEGMENT_OFF);
+    digitalWrite(segE, SEGMENT_ON);
+    digitalWrite(segF, SEGMENT_ON);
+    digitalWrite(segG, SEGMENT_ON);
+    break;
+        
+    case 13: // T Character
+    digitalWrite(segA, SEGMENT_ON);
+    digitalWrite(segB, SEGMENT_OFF);
+    digitalWrite(segC, SEGMENT_OFF);
+    digitalWrite(segD, SEGMENT_OFF);
+    digitalWrite(segE, SEGMENT_ON);
+    digitalWrite(segF, SEGMENT_ON);
+    digitalWrite(segG, SEGMENT_OFF);
+    break;
+  }
+}
+
+
+void displayHourMinute(int Disphour, int Dispminute) {
+
+  int NumberToDisplay;
+  NumberToDisplay = Disphour*100 + Dispminute;
+  displayNumber(NumberToDisplay, 0);
+
+}
+
+void check_buttons() {
+// Implements Plus/Minus time adjustment with three-speeds
+byte minutes;
+byte hours;
+int count = 0;
+int divider = SLOW_DIVIDER;
+
+//Retrieve current time:
+minutes = minute();
+hours = hour();
+if (!digitalRead(BTN_PLUS) || !digitalRead(BTN_MINUS)) { // only executes if one of the buttons was pressed
+Serial.println("After the if any button");
+
+	while (!digitalRead(BTN_PLUS)) {
+        Serial.println("After the while() PLUS");
+		  if ((count % divider) == 0) {
+			   IncrementTime(hours, minutes);
+			   if ((count >= FAST_THRESHOLD) && (count < SUPER_FAST_THRESHOLD) ) divider = FAST_DIVIDER; // Speeds-up after a few seconds
+			   if (count > SUPER_FAST_THRESHOLD ) divider = SUPER_FAST_DIVIDER;
+			   }
+		displayHourMinute(hours, minutes);
+                count++;
+	}
+
+	while (!digitalRead(BTN_MINUS)) {
+        Serial.println("After the while() MINUS");
+		  if ((count % divider) == 0) {
+			   DecrementTime(hours, minutes);
+			   if ((count >= FAST_THRESHOLD) && (count < SUPER_FAST_THRESHOLD) ) divider = FAST_DIVIDER; // Speeds-up after a few seconds
+			   if (count > SUPER_FAST_THRESHOLD ) divider = SUPER_FAST_DIVIDER;
+			   }
+		displayHourMinute(hours, minutes);
+                count++;
+	}
+
+  // SET the RTC once button is released
+  Wire.beginTransmission(DS1307_ADDRESS);
+  Wire.write(0x00); //stop Oscillator
+
+  Wire.write(decToBcd(3)); // seconds = 3 so it moves to clock display on return
+  Wire.write(decToBcd(minutes));
+  Wire.write(decToBcd(hours));
+  // Retains current day/week/moth/year settings
+  Wire.write(decToBcd(weekday()));
+  Wire.write(decToBcd(day()));
+  Wire.write(decToBcd(month()));
+  Wire.write(decToBcd(year()));
+  Wire.write(0x00); //re-start 
+  Wire.endTransmission();
+  setSyncProvider(RTC.get); // Need to re-sync Time with the RTC
+  Serial.println("After the Wire.endTransmission()");
+  } // End if  
+}
+
+void IncrementTime(byte &hours, byte &minutes) {
+	// Increment minutes and hours
+	minutes++;
+	if ( minutes > 59) {
+		minutes = 0;
+		hours++;
+		}
+	if ( hours > 23 ) hours = 0;
+}
+
+void DecrementTime(byte &hours, byte &minutes) {
+	// Decrement minutes and hours
+	if ( minutes != 0) {
+		minutes = minutes - 1;
+	}
+	else {
+		minutes = 59;
+		if ( hours > 0 ) {
+			hours = hours - 1 ;
+			}
+		else {
+			hours = 23;
+			}
+	}
+}
+
+byte decToBcd(byte val){
+// Convert normal decimal numbers to binary coded decimal
+  return ( (val/10*16) + (val%10) );
+}
