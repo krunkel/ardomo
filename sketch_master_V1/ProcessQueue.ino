@@ -52,6 +52,7 @@ void ProcessQueue() {
           sprintf(sLine,"queue Actie 1 - %i, %i, %i.\r\n",QueParm[QueProc][1],QueParm[QueProc][2],QueParm[QueProc][3]); Serial.print(sLine);
         #endif
         DoAction(QueParm[QueProc][1],QueParm[QueProc][2],QueParm[QueProc][3]);
+        sprintf(cItem,"QU:%02i:%02i:%02i",QueParm[QueProc][1],QueParm[QueProc][2],QueParm[QueProc][3]); CLog(cItem);
         break;
       case 2:  // Zend module update (0x04) Module-ID, Range (Ox05) Poort > Output, (Ox06) Input > Sensor + forceer update programma
         fModID = QueParm[QueProc][1];

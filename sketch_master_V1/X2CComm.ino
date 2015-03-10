@@ -6,8 +6,9 @@ void InitX2C()  { // Called from Setup()
     #ifdef DO_DEBUG
       sprintf(sLine,"X2C MyAddress = %i.\r\n",MyAddress[1]); Serial.print(sLine);
     #endif
-  Wire1.setClock(100000UL);     //1412 was 10000
-  Wire1.onReceive(ReceiveX2C);   // register event
+  // Wire1.setClock(100000UL); //1412 was 10000
+  Wire1.setClock(50000UL);     //tot 21 Feb 100000
+  Wire1.onReceive(ReceiveX2C); 
   #ifdef DO_DEBUG
     Serial.println("X2C setup ok..");
   #endif
@@ -51,22 +52,26 @@ void ReceiveX2C(int howMany){
 // ###### SendX2C ##################################################
 // #################################################################
 void SendX2C(byte fBuf) {
-    Wire1.begin();   // Set as master
-    Wire1.setClock(100000UL);      //1412 was 10000
-    //delay(10);
-    Wire1.beginTransmission(snd_Address[fBuf]);
-    byte flength = Wire1.write(snd_Buf[fBuf],snd_CC[fBuf]+1);    // Check:wire stopt bij 0x00 ???  
-    byte retcode = Wire1.endTransmission(true);
-    if (retcode != 0) {
-      #ifdef DO_DEBUG
-        Serial.println("failed X2C send."); 
-      #endif
-      snd_Status[fBuf] = 2; //Failed
-    }
-    else {
-      snd_Status[fBuf] = 1; //Send
-    }
-    Wire1.begin(MyAddress[1]);                // join X2C bus
-    Wire1.onReceive(ReceiveX2C);           // register event
+  DebugOn(3);
+  Wire1.begin();   // Set as master
+  // Wire1.setClock(100000UL); //1412 was 10000
+  Wire1.setClock(50000UL);     //tot 21 feb. 100000UL
+  
+  //delay(10);
+  Wire1.beginTransmission(snd_Address[fBuf]);
+  byte flength = Wire1.write(snd_Buf[fBuf],snd_CC[fBuf]+1);    // Check:wire stopt bij 0x00 ???  
+  byte retcode = Wire1.endTransmission(true);
+  if (retcode != 0) {
+    #ifdef DO_DEBUG
+      Serial.println("failed X2C send."); 
+    #endif
+    snd_Status[fBuf] = 2; //Failed
+  }
+  else {
+    snd_Status[fBuf] = 1; //Send
+  }
+  Wire1.begin(MyAddress[1]);                // join X2C bus
+  Wire1.onReceive(ReceiveX2C);           // register event
+  DebugOff(3);
 }
 

@@ -16,14 +16,19 @@ myInt = (int)myLong;
 myByte = (byte)MyInt 
 */
 #include <EEPROM.h>
-#include <Wire.h>
+// #include <Wire.h>
 #include <SPI.h>
+#include <WSWire.h>
+#include <avr/wdt.h>  // Watchdog  
+// NRF
+// NRF
+// NRF
 #include <printf.h>        
 #define DO_DEBUG           // comment out to eliminate debugging
 
 const char MyModel[6] = "MX88A";    // M(ini)X(2C)8(In)8(Uit)A  
-const char MyVersion[6] = "01.09";  // HW_SW versie  
-#define MAX_QUEUE 8
+const char MyVersion[6] = "01.11";  // HW_SW versie  
+#define MAX_QUEUE 4
 #define MAX_CMD_LEN 12 
 #define MAX_RCV_QUEUE 8  //(4, 8, 16) 
 #define MAX_SND_QUEUE 8  //(4, 8, 16)
@@ -65,7 +70,7 @@ volatile byte snd_Address[MAX_SND_QUEUE];
 byte snd_Buf[MAX_SND_QUEUE][MAX_CMD_LEN];    //  Volatile????? 
 volatile unsigned long snd_Time[MAX_SND_QUEUE];
 volatile byte snd_Count[MAX_SND_QUEUE];   // ??????
-const int Resend_TimeOut = 500;  // Wait for respons in ms
+int Resend_TimeOut;
 const int snd_MaxCount = 10;   
 // RCV BUFFER (inkomende commando's)
 const byte MAX_RCV_Mask = MAX_RCV_QUEUE - 1; //???
@@ -106,6 +111,8 @@ void setup() {
   #endif
   randomSeed(analogRead(A7));
   NextReport = millis() + random(2000,12000);
+  Resend_TimeOut = random(300,700);  // Wait for respons in ms
+  wdt_reset(); // Reset timer watchdog....
   // ===== SETUP LOCAL PORTS ===================================
   for (byte port = 1; port < LOC_PORT ; port++)   {
     pinMode(PrtPin[port],OUTPUT);
@@ -131,15 +138,14 @@ void setup() {
     PortState[port] = AAN;
   }
   // TODO ANAIN
-  #ifdef DO_DEBUG
-    printf("Poort setup ok...\n\r");
-  #endif
-// ===== END SETUP LOCAL PORTS ===============================
+  // ===== END SETUP LOCAL PORTS ===============================
   // Lees Address uit Eeprom (Std 119) als 0 dan 119
+  wdt_reset(); // Reset timer watchdog....
   if (EEPROM.read(1) == 'A')  MyAddress = EEPROM.read(2);  // Enkel write als commando Master
   if ((MyAddress <= BUS_MASTER) || (MyAddress > BUS_DEFAULT)) MyAddress = BUS_DEFAULT;   
   #ifdef DO_DEBUG 
-    printf("MyAddress ex EEPROM = %i.\n\r ",MyAddress);
+    // sprintf(sLine,"MyAddr ex EEPROM = %i.\n\r ",MyAddress); Serial.print(sLine);
+    printf("MyAddr ex EEPROM = %i.\n\r ",MyAddress);
   #endif
   if ((EEPROM.read(3) == 'P') && (EEPROM.read(4) == 'G')) { // Program Inputs
     for (byte port = 0; port < LOC_DIGIN ; port++) {
@@ -152,7 +158,11 @@ void setup() {
       for (int x = 0; x < 6 ; x++) EEPROM.write((128+port*6+x),Action[port][x]);
     }
   }
-// ===== INIT BUS  (RF/X2X/..)=+ meld module==================
+  // ===== Start watchdog (reset na 2 sec) =====
+//  cli(); 
+  wdt_enable(WDTO_8S);      // Reset door Watchdog na 8 sec
+  // ===== INIT BUS  (RF/X2X/..)=+ meld module =====
+  wdt_reset(); // Reset timer watchdog....
   InitBUS();
 }
 
@@ -161,6 +171,7 @@ void setup() {
 // #################################################################
 void loop()
 {
+  wdt_reset(); // Reset timer watchdog....
   ReadMyPins();
   yield();
   // ReceiveBUS(); Interrupt

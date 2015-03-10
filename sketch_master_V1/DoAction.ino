@@ -74,7 +74,7 @@ void DoAction(byte OnRange, byte OnPort, byte xAction) {
     for (byte x = 0; x < moo_Lenght[OnPort];x++) {
       short fEl = moo_Pointer[OnPort] + x;
       if (moo_ElValue[fEl] > 0) {
-        Queue('H',1,moo_ElRange[fEl], moo_ElPort[fEl], moo_ElValue[fEl],0,0,0,1);
+        Queue('L',1,moo_ElRange[fEl], moo_ElPort[fEl], moo_ElValue[fEl],0,0,0,1);
         // yield();
       }  
     }
@@ -145,7 +145,10 @@ void ReadMyPins ()   {
       if (PortState[port] == HIGH && PortPrevStat [port] == LOW){  // End pressing
         PortStateStart[port] = millis();
         if ((millis() - PortStart[port]) < LongClick) {
-          if (Action[port][2] > 0) DoAction(Action[port][0], Action[port][1], Action[port][2]);  // Actie 1  queue naar master: opdracht of status
+          if (Action[port][2] > 0) {
+            DoAction(Action[port][0], Action[port][1], Action[port][2]);  // Actie 1  queue naar master: opdracht of status
+            sprintf(cItem,"PI:%02i:%02i:%02i",Action[port][0], Action[port][1], Action[port][2]); CLog(cItem);
+          }
         }
         else if (Action[port][5] & B10000000) Action[port][5] = Action[port][5] ^ B01000000;      //Toggle Up/down bij einde longpress
       }

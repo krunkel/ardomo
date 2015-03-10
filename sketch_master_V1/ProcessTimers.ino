@@ -104,9 +104,9 @@ void ProcessTimers() {
         else {
           tim_Done[i] = false; 
           if ((tim_SecToday[i] > 0 ) && (fSecofDay >= tim_SecToday[i]) && ((fSecofDay-15) <  tim_SecToday[i])) {            
+            sprintf(lLine,"Timer %i.\0",i); lLog(lLine);
             DoAction (tim_Act1[i],tim_Act2[i],tim_Act3[i]);
             tim_Today[i] = false;  // slechts 1 keer per dag....
-            sprintf(lLine,"Timer %i.\0",i); lLog(lLine);
           }
         }
       }

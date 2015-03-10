@@ -34,7 +34,7 @@ void ProcessCommand() {
       snd_Buf[buf][3] = rcv_Buf[rcv_Procs][fDataLenght+3];  // CC
       byte fRC = 1; // RC
       #ifdef DO_DEBUG
-        printf("Afz: 0x%02X, Command: 0x%02X, BUS_MASTER: 0x%02X, Lenght: 0x%02X.\n\r",fAfzender,rcv_Buf[rcv_Procs][1], BUS_MASTER,fDataLenght );
+        printf("Afz: 0x%02X, Comm: 0x%02X, MASTER: 0x%02X, Len: 0x%02X.\n\r",fAfzender,rcv_Buf[rcv_Procs][1], BUS_MASTER,fDataLenght );
       #endif
       switch (rcv_Buf[rcv_Procs][1]) {
         case 0x01:         // Pas adres bus aan en reset bus
@@ -98,9 +98,9 @@ void ProcessCommand() {
           else fRC = 1; // RC
           break;
       }  //END SWITCH
-      #ifdef DO_DEBUG
-        printf("Command processed...\n\r");
-      #endif
+      //#ifdef DO_DEBUG
+      //  printf("Command processed...\n\r");
+      //#endif
       snd_Buf[buf][4] = fRC;  // RC
       snd_Count[buf]= 0;
       SendBus(buf);
@@ -122,27 +122,24 @@ int CheckCommand(byte fIndex) {
   //  printf("Check command  van bus %i.\n\r",rcv_Bus[fIndex]);
   //#endif
   if (fDataLenght > (MAX_CMD_LEN-4)) {  
-    #ifdef DO_DEBUG
-      printf("Datalenght Command te groot...\n\r");
-    #endif
     return false;
   } else {
     myCC = rcv_Buf[fIndex][0] + rcv_Buf[fIndex][1] + fDataLenght;
-    #ifdef DO_DEBUG
-       printf("Command van 0x%X: 0x%X-0x%X-",rcv_Buf[fIndex][0],rcv_Buf[fIndex][1],fDataLenght);
-    #endif
+    // #ifdef DO_DEBUG
+    //    printf("Command van 0x%X: 0x%X-0x%X-",rcv_Buf[fIndex][0],rcv_Buf[fIndex][1],fDataLenght);
+    // #endif
     byte fPos = 3;  
     while(fPos < fDataLenght + 3 )  {      
-      #ifdef DO_DEBUG
-         printf("0x%X-",rcv_Buf[fIndex][fPos]);
-      #endif
+      // #ifdef DO_DEBUG
+      //    printf("0x%X-",rcv_Buf[fIndex][fPos]);
+      // #endif
       myCC += rcv_Buf[fIndex][fPos];
       fPos++; 
     }
     //
-    #ifdef DO_DEBUG
-       printf("0x%X\n\r", rcv_Buf[fIndex][fPos]);
-    #endif
+    // #ifdef DO_DEBUG
+    //    printf("0x%X\n\r", rcv_Buf[fIndex][fPos]);
+    // #endif
     if (myCC != rcv_Buf[fIndex][fPos]) return 0;
     return fPos;
   }  

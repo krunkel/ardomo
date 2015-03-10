@@ -1,7 +1,20 @@
 // #################################################################
 // ###### MODRF24A #################################################
 // #################################################################
-// Kenmerken Mini: 8 AnaIn 0 AnaOut 14 DigIn 6 PWM	 1KB Eeprom 2KB SRAM 32KB Flash
+/* Kenmerken Mini: 8 AnaIn 0 AnaOut 14 DigIn 6 PWM	 1KB Eeprom 2KB SRAM 32KB Flash
+
+
+
+
+
+
+
+
+
+
+
+
+*/
 #include <EEPROM.h>
 #include <Wire.h>
 #include <SPI.h>

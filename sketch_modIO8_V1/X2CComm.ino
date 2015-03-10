@@ -1,21 +1,26 @@
-// ################################################################################
-// ###### InitBUS ################################################## 20DEC14 ######
-// ################################################################################
+// #################################################################
+// ###### InitBUS ##################################################
+// #################################################################
 void InitBUS()  { // Called from Setup()
   Wire.begin(MyAddress); 
-  TWBR = 72;  // TWBR = 152 > 50 kHz  -- TWBR = 72 > 100 kHz (default)
+  // I2C.begin()
+  // TWBR = 72;  // TWBR = 152 > 50 kHz  -- TWBR = 72 > 100 kHz (default)
+  TWBR = 152;  // Aanpassing na toevoeging pull-up en toch nog vastlopen
   Wire.onReceive(ReceiveBUS);           // register event
-  #ifdef DO_DEBUG
-    printf("X2C setup ok..\n\r");
-  #endif
-  delay(50);
+  //#ifdef DO_DEBUG
+  //  printf("X2C setup ok..\n\r");
+  //#endif
+  delay(20);
   //Report2Master();
 }
-// ################################################################################
-// ###### ReceiveBUS ############################################### 29NOV14 ######
-// ################################################################################
+// #################################################################
+// ###### ReceiveBUS ###############################################
+// #################################################################
 // Command = Bus/Afzender/Command/DatLen/D1/../DN/CC
 void ReceiveBUS(int howMany){ 
+  #ifdef DO_DEBUG
+    Serial.print(F("Receive Start - "));
+  #endif
   while (Wire.available() > 0) {
     byte MyIndex = 0;
     byte rcv_End = MAX_CMD_LEN;
@@ -30,28 +35,35 @@ void ReceiveBUS(int howMany){
        rcv_Index&=MAX_RCV_Mask;
     }
   }
+  #ifdef DO_DEBUG
+    Serial.println(F("Receive end."));
+  #endif
 }
 
-// ################################################################################
-// ###### SendBusX ################################################# 20DEC14 ######
-// ################################################################################
+// #################################################################
+// ###### SendBusX #################################################
+// #################################################################
 void SendBusX(byte fBuf) {
     Wire.begin();   // Set as master
-    Wire.setClock(100000UL);      //1412 was 10000
+    // Wire.setClock(100000UL);      //1412 was 10000
+    // VERWIJDERD VOOR WSWIRE  Wire.setClock(50000UL);      //21 Feb was 100000
     //delay(10);
+    #ifdef DO_DEBUG
+      printf("Send X2C Start naar %i - ", snd_Address[fBuf]); 
+    #endif
     Wire.beginTransmission(snd_Address[fBuf]);
-    byte flength = Wire.write(snd_Buf[fBuf],snd_CC[fBuf]+2);    // Check:wire stopt bij 0x00 ???  
-    byte retcode = Wire.endTransmission(true);
-      #ifdef DO_DEBUG
-        printf("Send X2C flength = %i, CCPlus1 = %i.\n\r", flength,snd_CC[fBuf]+1); 
-      #endif
+    byte flength = Wire.write(snd_Buf[fBuf],snd_CC[fBuf]+2);  
+    // AANGEPAST VOOR WSWIRE byte  retcode = Wire.endTransmission(true);
+    int retcode = Wire.endTransmission();
+    #ifdef DO_DEBUG
+      printf(" Einde length = %i, retcode = %i.\n\r", flength, retcode); 
+    #endif
     if (retcode != 0) {
       #ifdef DO_DEBUG
-        printf("failed X2C send.\n\r"); 
+        Serial.println(F("failed X2C send.")); 
       #endif
       snd_Status[fBuf] = 2; //Failed
-    }
-    else {
+    } else {
       snd_Status[fBuf] = 1; //Send
     }
     Wire.begin(MyAddress);                // join X2C bus

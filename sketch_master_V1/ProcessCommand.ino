@@ -80,6 +80,7 @@ void ProcessCommand() {
               sprintf(sLine,"fOutput = %i fAction = %i .\r\n", fOutput ,fAction); Serial.print(sLine);
             #endif
             Queue('H',1,fRange, fOutput, fAction,0,0,0,1);
+            sprintf(cItem,"FM:%02i:%02i:%02i",rcv_Bus[rcv_Procs],fAfzender,fOutput); CLog(cItem);
             fRC = 0x00;  //RC
           }
           break;

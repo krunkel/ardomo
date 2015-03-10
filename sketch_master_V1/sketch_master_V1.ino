@@ -270,11 +270,13 @@ TM1637 tm1637(TM1637_CLK,TM1637_DIO);
 int8_t TimeDisp[] = {0x01,0x02,0x03,0x04};
 TimeLord myLord;
 byte sunTime[]  = {0, 0, 0, 1, 1, 15}; // 1 jan 2015
+unsigned long StartTime;
 unsigned long LastTime;
 unsigned long LastLogic = 0;   
 bool TimeFlash = false; // flash :
 BH1750 lightMeter;
 char sLine[120];
+char cItem[10];
 char lLine[80];
 SdFat MySD;
 Sd2Card MyCard;
@@ -284,12 +286,16 @@ SdFile MySDfile;
 // char logFile[20]; // /log/YYYYMMDD.LOG
 byte numFailed = 0;
 char logFailed[60];
+volatile char CircLog[266];
+volatile byte CircPoint = 0;
 bool logOk = false;
 
 // ################################################################################
 // ###### SETUP ###################################################################
 // ################################################################################
 void setup() {
+  CircLog[265] = 0;
+  for (int x = 0; x < 265 ; x++) CircLog[x] = '.';
   logFailed[0] = 0;
   #ifdef DO_DEBUG
     Serial.begin(115200);
@@ -299,7 +305,7 @@ void setup() {
   //SPI.begin(4);
   if (!MySD.begin(SD_CSN, SPI_HALF_SPEED)) {
     #ifdef DO_DEBUG
-      Serial.println("initialization failed!");
+      Serial.println(F("initialization failed!"));
     #endif 
   }
   else {
@@ -310,7 +316,8 @@ void setup() {
     #endif  
   }
   Wire.begin();  // voor speciale I2C modules
-  Wire.setClock(100000UL);      //1412 was 10000
+  // Wire.setClock(100000UL);  //1412 was 10000
+  Wire.setClock(50000UL);      //Was 100000UL tot 21 feb.
   InitX2C();
   #ifdef DO_DEBUG
     Serial.println(F("I2C en X2C ready"));
@@ -330,6 +337,7 @@ void setup() {
   delay(200);
   RTClock.setClockMode(false);   // 24u
   DoTijdSync(false);
+  StartTime = now();
   // TIMELORD
   myLord.TimeZone(TIMEZONE * 60);
   myLord.Position(LATITUDE, LONGITUDE);
@@ -345,7 +353,7 @@ void setup() {
   // Scheduler.startLoop(webserver);
   // =======================================================
   #ifdef DO_DEBUG
-    Serial.print("webserver is at ");
+    Serial.print(F("webserver is at "));
     Serial.println(Ethernet.localIP());
     Serial.println(F("Internet ready"));
   #endif  
@@ -453,4 +461,15 @@ void loop() {
    void DebugOff(byte dLed) {
      digitalWrite(DebugLed[dLed],HIGH);
    }
+// #################
+// ###### CLog #####
+// #################
+void CLog(char* toLog) {
+  for(int x = 0; x<strlen(toLog);x++) {
+    CircLog[CircPoint] = toLog[x];
+    CircPoint++;
+  }
+  CircLog[CircPoint] = ':';
+  CircPoint++;
+}
 

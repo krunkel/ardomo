@@ -44,7 +44,7 @@ void ProcessQueue() {
   while ( QueNext != QueProc ) {
     switch (QueType[QueProc]) {
       case 1: {   // DoAction
-        printf("queue Actie 1 - %1, %2, %3./n/r",QueParm[QueProc][1],QueParm[QueProc][2],QueParm[QueProc][3]);
+        //printf("queue Actie 1 - %1, %2, %3./n/r",QueParm[QueProc][1],QueParm[QueProc][2],QueParm[QueProc][3]);
         DoAction(QueParm[QueProc][1],QueParm[QueProc][2],QueParm[QueProc][3]);
       }
       break;
@@ -92,8 +92,9 @@ void SendBusQueue() {
       }
       else {
         bool bResend = false;
-        if (snd_Status[y] == 2) bResend = true ; //Failed > sturen direct terug
-        else if (snd_Status[y] == 1) {
+        // if (snd_Status[y] == 2)  bResend = true ; //Failed > sturen direct terug
+        // else if (snd_Status[y] == 1) {
+        if ((snd_Status[y] == 2) || (snd_Status[y] == 1))  { 
           unsigned long timepassed = millis() - snd_Time[y];
           if (timepassed > Resend_TimeOut) bResend = true;
         }
@@ -114,20 +115,20 @@ void SendBus(byte fBuf) {   //Buf = Afz/Comm/Len/X1..Xn)
     snd_Status[fBuf] = 0;   // 1 = verzonden / 2 = resending / ??? Nodig
     byte fCheck = snd_Buf[fBuf][0] + snd_Buf[fBuf][1] + snd_Buf[fBuf][2];
     byte flength = snd_Buf[fBuf][2]+3;
-    #ifdef DO_DEBUG
-      printf("Send Address: %X: 0x%X-0x%X-0x%X",snd_Address[fBuf], snd_Buf[fBuf][0], snd_Buf[fBuf][1],snd_Buf[fBuf][2]);
-    #endif
+    // #ifdef DO_DEBUG
+    //   printf("Send Address: %X: 0x%X-0x%X-0x%X",snd_Address[fBuf], snd_Buf[fBuf][0], snd_Buf[fBuf][1],snd_Buf[fBuf][2]);
+    // #endif
     for (byte x = 3; x <  flength ; x++) {
       fCheck += snd_Buf[fBuf][x];
-      #ifdef DO_DEBUG
-        printf("-0x%X",snd_Buf[fBuf][x]);
-      #endif
+      // #ifdef DO_DEBUG
+      //   printf("-0x%X",snd_Buf[fBuf][x]);
+      // #endif
     }
     snd_Buf[fBuf][flength] = fCheck;
     snd_CC[fBuf] = flength;
-    #ifdef DO_DEBUG
-      printf("-0x%X\n\r",fCheck);
-    #endif
+    // #ifdef DO_DEBUG
+    //   printf("-0x%X\n\r",fCheck);
+    // #endif
   }
   snd_Count[fBuf]++;
   snd_Time[fBuf] = millis();

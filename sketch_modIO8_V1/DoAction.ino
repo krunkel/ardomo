@@ -9,7 +9,7 @@
 void DoAction(byte OnRange, byte OnPort, byte xAction) {
   if (OnRange == 0) {    // LOKALE POORT 
     #ifdef DO_DEBUG
-      printf("On Port: %i Do Action: %i.\n\r",OnPort,xAction);
+      printf("On Port: %i Act: %i.\n\r",OnPort,xAction);
     #endif
     int OldValue = PrtVal[OnPort];
     int NewValue = OldValue;
@@ -58,7 +58,7 @@ void DoAction(byte OnRange, byte OnPort, byte xAction) {
       }
       else if (PrtType[OnPort] == 2) analogWrite(PrtPin[OnPort],(byte)NewValue);
       #ifdef DO_DEBUG
-        printf("Switch on Port: %i Value: %i.\n\r",OnPort, NewValue);
+        printf("Switch on: %i Val: %i.\n\r",OnPort, NewValue);
       #endif
     } 
   }
@@ -90,9 +90,9 @@ void ReadMyPins ()   {
         PortStart[port] = millis();   // Start pressing
         PortLastIncr[port] = millis();   // LastIncr
         PortStateStart[port] = millis();
-        #ifdef DO_DEBUG
-          printf("Input down start op:%i.\n\r", port);
-        #endif
+        // #ifdef DO_DEBUG
+        //   printf("Down start op:%i.\n\r", port);
+        // #endif
       }
       else fDelta = millis() - PortStart[port];     
       if ((PortState[port] == LOW) && (PortPrevStat[port] == LOW)  && (Action[port][5] > 0)) {  // Cont pressing
@@ -117,10 +117,10 @@ void ReadMyPins ()   {
         if ((millis() - PortStart[port]) < LongClick) {
           if (Action[port][2] > 0) DoAction(Action[port][0], Action[port][1], Action[port][2]);  // Actie 1  queue naar master: opdracht of status
         }
-        else if (Action[port][5] & B10000000) Action[port][5] = Action[port][5] ^ B01000000;      //Toggle Up/down bij einde longpress
-        #ifdef DO_DEBUG
-          printf("Input up op:%i.\n\r", port);
-        #endif
+        else if (Action[port][5] & B10000000) Action[port][5] = Action[port][5] ^ B01000000;     //Toggle Up/down bij einde longpress
+        // #ifdef DO_DEBUG
+        //   printf("Up op:%i.\n\r", port);
+        // #endif
       }
       if (PortPrevStat[port] != PortState[port]) {
         PortPrevStat[port] = PortState[port];

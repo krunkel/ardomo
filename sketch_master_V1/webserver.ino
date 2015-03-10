@@ -158,6 +158,7 @@ void checkWebServer() {
             client.print(F("<table><caption>Systeem:</caption>\r\n"));
             client.print(F("<tr><th>ID</th><th>Waarde</th></tr>"));
             sprintf(tBuf, "<tr><td>Tijd</td><td>%02i:%02i:%02i - %02i/%02i/%04i</td></tr>",tim_Reeks[2],tim_Reeks[1],tim_Reeks[0],tim_Reeks[3],tim_Reeks[4],2000+tim_Reeks[5]); client.print(tBuf);
+            sprintf(tBuf, "<tr><td>Tijd Start</td><td>%02i:%02i - %02i/%02i/%04i</td></tr>",hour(StartTime),minute(StartTime),day(StartTime),month(StartTime), year(StartTime)); client.print(tBuf);
             byte uu = tim_Sunrise / 3600;
             byte mm = (tim_Sunrise % 3600) / 60;
             byte ss = (tim_Sunrise % 3600) % 60;
@@ -201,6 +202,36 @@ void checkWebServer() {
               sprintf(tBuf, "<td>%i</td><td>%i</td><td>%i</td></tr>",tim_Today[x],tim_Done[x],tim_SecToday[x]); client.print(tBuf);
             }
             client.print(F("</table>\r\n</body></html>\r\n"));
+            client.print(F("<table><caption>Moods:</caption>\r\n"));
+            client.print(F("<tr><th>ID</th><th>#</th><th>0</th><th>1</th><th>2</th>"));
+            client.print(F("<th>3</th><th>4</th><th>5</th><th>6</th></tr>\r\n"));
+            for (byte x=0;x<num_moods;x++) {
+              sprintf(tBuf, "<tr><td>%i</td><td>%i</td>",x,moo_Lenght[x]); client.print(tBuf);
+                           // 123456891123456892123456893123456894123456895123456896
+              for (byte y=0;y<moo_Lenght[x];y++) {
+                short fEl = moo_Pointer[x] + y;
+                if (y < 7) {
+                   sprintf(tBuf, "<td>%i:%i:%i</td>",moo_ElRange[fEl], moo_ElPort[fEl], moo_ElValue[fEl]); client.print(tBuf);
+                }  
+              }  
+              sprintf(tBuf, "</tr>"); client.print(tBuf);
+            }
+            client.print(F("</table>\r\n"));
+            byte y = 0;
+            for (short x = 0; x < 256 ; x++) {
+              tBuf[y] = CircLog[x];
+              y++;
+              if (y == 60) {
+                tBuf[y] = 0;
+                client.print(tBuf);
+                client.print(F("<br>\r\n"));
+                y = 0;
+              }
+            }
+            tBuf[y] = 0;
+            client.print(tBuf);
+            client.print(F("<br>\r\n"));
+            client.print(F("</body></html>\r\n"));
             client.stop();  
             DebugOff(1);
             return;

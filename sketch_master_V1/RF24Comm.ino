@@ -46,7 +46,7 @@ void ReceiveRF() {
 }
  
 void SendRF(byte fBuf) {
-  DebugOn(3);
+  //DebugOn(3);
   RF_CLIENT_FULL[3] = snd_Address[fBuf];      
   radio.openWritingPipe(RF_CLIENT_FULL);  
   yield();
@@ -61,6 +61,6 @@ void SendRF(byte fBuf) {
     snd_Status[fBuf] = 1; //Send
   }
   radio.startListening();
-  DebugOff(3);
+  //DebugOff(3);
 }
 

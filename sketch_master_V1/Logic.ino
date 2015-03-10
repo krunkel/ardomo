@@ -66,8 +66,9 @@ void Dologic(short lNum) {
         byte x = 0;
         while ((delay_logic[x] != lNum) && (delay_act[x]) && (x < MAX_DELAY)) x++; 
         if (x < MAX_DELAY) {
-          if (log_Val1[lNum] == 0) {          
-            DoAction (log_Act1Range[lNum],log_Act1Port[lNum],log_Act1Act[lNum]);
+          if (log_Val1[lNum] == 0) {
+            Queue('L',1,log_Act1Range[lNum],log_Act1Port[lNum],log_Act1Act[lNum],0,0,0,1);
+            // DoAction (log_Act1Range[lNum],log_Act1Port[lNum],log_Act1Act[lNum]);
           } else {
             delay_act[x] = true;
             delay_logic[x] = lNum;
@@ -102,13 +103,15 @@ void Dologic(short lNum) {
         break;
     }  // end switch
     if (DoAct && (log_Act1Act[lNum] > 0)) {
-      DoAction(log_Act1Range[lNum], log_Act1Port[lNum], log_Act1Act[lNum]);
+      Queue('L',1,log_Act1Range[lNum],log_Act1Port[lNum],log_Act1Act[lNum],0,0,0,1);
+      // DoAction(log_Act1Range[lNum],log_Act1Port[lNum],log_Act1Act[lNum]);
       #ifdef DO_DEBUG
         sprintf(sLine, "Aktie!= Logic:%i Range:%i Port:%i Actie:%i.\r\n", lNum, log_Act1Range[lNum], log_Act1Port[lNum], log_Act1Act[lNum]); Serial.print(sLine);
       #endif
     }
     if ((DoAct == false) && (log_Act2Act[lNum] > 0) && (log_pType[lNum] < 20)) {
-      DoAction(log_Act2Range[lNum], log_Act2Port[lNum], log_Act2Act[lNum]);
+      Queue('L',1,log_Act2Range[lNum],log_Act2Port[lNum],log_Act2Act[lNum],0,0,0,1);
+      // DoAction(log_Act2Range[lNum],log_Act2Port[lNum],log_Act2Act[lNum]);
       #ifdef DO_DEBUG
         sprintf(sLine, "Aktie (false)!= Logic:%i Range:%i Port:%i Actie:%i.\r\n", lNum, log_Act2Range[lNum], log_Act2Port[lNum], log_Act2Act[lNum]); Serial.print(sLine);
       #endif
